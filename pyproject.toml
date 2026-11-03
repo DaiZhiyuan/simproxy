@@ -13,15 +13,22 @@ license-files = ["LICENSE"]
 authors = [{ name = "SimProxy contributors" }]
 keywords = ["simpoint", "dynamorio", "qemu", "simulation", "arm64"]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: C",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
 ]
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 parquet = ["pyarrow>=12"]
-dev = ["pytest>=7", "ruff>=0.4"]
-all = ["pyarrow>=12", "pytest>=7", "ruff>=0.4"]
+dev = ["build>=1.0", "pytest>=7", "ruff>=0.4"]
+all = ["build>=1.0", "pyarrow>=12", "pytest>=7", "ruff>=0.4"]
 
 [project.scripts]
 simproxy = "simproxy.cli:main"
@@ -31,6 +38,9 @@ package-dir = { "" = "python" }
 
 [tool.setuptools.packages.find]
 where = ["python"]
+
+[tool.setuptools.package-data]
+simproxy = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

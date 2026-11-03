@@ -15,10 +15,10 @@ The pipeline combines:
   high-fidelity trace-stitching mode used only for validation.
 - **QEMU TCG plugins** as the metric/validation backend.
 
-> Status: M3 v0 (statistical proxy kernels). BBV parsing/writing, SimPoint
+> Status: M5 (packaging). BBV parsing/writing, reference-compatible SimPoint
 > clustering, per-interval feature tables and ARM64 proxy code generation are
-> available. The generated ELF runs under `qemu-aarch64-static`; fidelity tuning
-> and the extended profiler arrive in M2/M4.
+> available, with a Docker image, examples, and a CI matrix. Fidelity tuning and
+> the extended profiler remain pending; see `CHANGELOG.md`.
 
 ## Architecture
 
@@ -35,7 +35,33 @@ target ELF ──▶ DynamoRIO (drmemtrace / bbv client) ──▶ BBV + extende
                                                    qemu-aarch64 (+ plugins)
 ```
 
+## Install
+
+```bash
+pip install 'simproxy[parquet]'
+# or from a checkout
+pip install -e '.[dev]'
+```
+
+Full instructions (Docker, cross toolchain, wheels) are in
+[`docs/install.md`](docs/install.md). The Docker image bundles
+`aarch64-linux-gnu-gcc` and `qemu-user-static`:
+
+```bash
+docker build -t simproxy .
+docker run --rm simproxy --version
+```
+
 ## Quick start
+
+The shortest path is the self-contained example:
+
+```bash
+./examples/quickstart.sh
+```
+
+It builds a synthetic three-phase BBV, extracts features, clusters it, emits a
+static ARM64 proxy, and runs it under QEMU. The manual pipeline:
 
 ```bash
 # 1. Fetch pinned DynamoRIO toolchains (host + AArch64)
@@ -106,6 +132,9 @@ QEMU user-mode emulation. See `docs/toolchain.md`.
 | `tests/` | Unit and end-to-end tests |
 | `scripts/` | Toolchain bootstrap and helpers |
 | `benchmarks/` | Microbenchmarks and workload drivers |
+| `examples/` | Quickstart script and usage examples |
+| `Dockerfile` | Image with cross compiler and QEMU |
+| `CHANGELOG.md` | Release notes and known limitations |
 
 ## License
 

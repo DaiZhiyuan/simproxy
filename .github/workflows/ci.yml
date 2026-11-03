@@ -15,9 +15,62 @@ jobs:
       - name: Install
         run: python -m pip install -e '.[dev]'
       - name: Lint
-        run: python -m ruff check python tests
+        run: python -m ruff check python tests scripts
       - name: Test
         run: python -m pytest -q
+
+  cross:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu qemu-user-static
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+      - name: Test proxy build and run
+        run: python -m pytest -q tests/e2e/test_proxy_run.py
+
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build distributions
+        run: |
+          python -m pip install build
+          python -m build
+      - name: Install wheel
+        run: |
+          python -m pip install --force-reinstall dist/simproxy-*.whl
+          simproxy --version
+          python -c "import simproxy, simproxy.synth, simproxy.profiler"
+
+  reference:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+      - name: Build reference SimPoint
+        run: |
+          git clone --depth 1 https://github.com/hanhwi/SimPoint.git /tmp/SimPoint
+          make -C /tmp/SimPoint/simpoint_ref
+      - name: Equivalence benchmark
+        env:
+          SIMPOINT_BIN: /tmp/SimPoint/simpoint_ref/bin/simpoint
+        run: |
+          python scripts/benchmark_simpoint.py --cases 10
+          python -m pytest -q tests/e2e/test_simpoint_reference.py
 
   drclient:
     runs-on: ubuntu-24.04
