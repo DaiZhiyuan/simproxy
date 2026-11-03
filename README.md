@@ -38,8 +38,6 @@ target ELF ──▶ DynamoRIO (drmemtrace / bbv client) ──▶ BBV + extende
 ## Install
 
 ```bash
-pip install 'simproxy[parquet]'
-# or from a checkout
 pip install -e '.[dev]'
 ```
 
@@ -58,33 +56,6 @@ The shortest path is the self-contained example:
 
 ```bash
 ./examples/quickstart.sh
-```
-
-It builds a synthetic three-phase BBV, extracts features, clusters it, emits a
-static ARM64 proxy, and runs it under QEMU. The manual pipeline:
-
-```bash
-# 1. Fetch pinned DynamoRIO toolchains (host + AArch64)
-SIMPROXY_TOOLS_DIR=/home/daizhiyuan/workspace/tmpdir/simproxy-tools \
-  ./scripts/bootstrap_toolchain.sh
-
-# 2. Create a virtualenv and install the package
-python3 -m venv /home/daizhiyuan/workspace/tmpdir/simproxy-venv
-/home/daizhiyuan/workspace/tmpdir/simproxy-venv/bin/pip install -e '.[dev]'
-
-# 3. Run unit + end-to-end tests
-/home/daizhiyuan/workspace/tmpdir/simproxy-venv/bin/python -m pytest -q
-
-# 4. Derive per-interval features (optionally merged with profiler summaries)
-simproxy profile -i prog.bbv -o features.jsonl \
-  --summary summary.jsonl --opcode-csv opcode_mix.csv
-simproxy features validate -i features.jsonl
-
-# 5. Cluster the BBV, fit phase kernels and build an ARM64 proxy
-simproxy simpoint -i prog.bbv -o simpoints.json
-simproxy synth -i simpoints.json -o proxy_spec.json \
-  --features features.jsonl --emit-elf proxy.elf --manifest manifest.json
-qemu-aarch64-static ./proxy.elf
 ```
 
 ### Verifying against reference SimPoint
