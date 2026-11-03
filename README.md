@@ -69,10 +69,16 @@ the reference SimPoint 3.2 binary (used only as a test oracle):
 ```bash
 SIMPOINT_BIN=/path/to/SimPoint.3.2/bin/simpoint \
   python scripts/validate_simpoint.py prog.bbv --k 3 --strict
+
+SIMPOINT_BIN=/path/to/SimPoint.3.2/bin/simpoint \
+  python scripts/benchmark_simpoint.py --cases 20
 ```
 
-The writer emits the canonical SimPoint dialect (`T:1:48 :3:24`), so reference
-tooling can consume SimProxy `.bbv` files directly.
+`--backend simpoint` reproduces the reference projection, initialization and
+convergence exactly. A 20-case randomized matrix matched all representative
+intervals with weight error `<= 3.33e-7`; see `docs/validation.md`. The writer
+emits the canonical SimPoint dialect (`T:1:48 :3:24`), so reference tooling can
+consume SimProxy `.bbv` files directly.
 
 ### Building the DynamoRIO client (AArch64)
 

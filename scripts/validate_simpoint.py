@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from simproxy.cluster import cluster, select_representatives
+from simproxy.cluster import cluster, cluster_reference, select_representatives
 from simproxy.formats.bbv import parse_bbv, to_matrix
 
 
@@ -50,15 +50,20 @@ def run_reference(binary: Path, bbv_path: Path, k: int, workdir: Path):
     return intervals, weights
 
 
-def run_simproxy(bbv_path: Path, k: int, projection_dim: int):
+def run_simproxy(bbv_path: Path, k: int, backend: str, projection_dim: int | None):
     bbv = parse_bbv(bbv_path)
     _, matrix = to_matrix(bbv, normalize=True)
+    if backend == "simpoint":
+        reference = cluster_reference(matrix, k, projection_dim=projection_dim or 15)
+        intervals = [bbv.interval_ids[index] for index in reference.representatives]
+        return intervals, reference.weights, reference.bic
+
     result = cluster(
         matrix,
         k_min=k,
         k_max=k,
         seed=0,
-        projection_dim=projection_dim,
+        projection_dim=projection_dim or 10,
         bic_tolerance=1.0,
     )
     representatives = select_representatives(
@@ -66,7 +71,7 @@ def run_simproxy(bbv_path: Path, k: int, projection_dim: int):
     )
     weights = np.bincount(result.labels, minlength=result.k) / len(matrix)
     intervals = [bbv.interval_ids[index] for index in representatives]
-    return intervals, weights.tolist()
+    return intervals, weights.tolist(), result.bic
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -74,7 +79,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("bbv", type=Path)
     parser.add_argument("--k", type=int, required=True)
     parser.add_argument("--simpoint-bin", type=Path, default=None)
-    parser.add_argument("--projection-dim", type=int, default=10)
+    parser.add_argument(
+        "--backend", choices=["simpoint", "achlioptas"], default="simpoint"
+    )
+    parser.add_argument("--projection-dim", type=int, default=None)
     parser.add_argument("--tolerance", type=float, default=1e-6)
     parser.add_argument(
         "--strict",
@@ -98,14 +106,15 @@ def main(argv: list[str] | None = None) -> int:
         reference_intervals, reference_weights = run_reference(
             binary, args.bbv, args.k, Path(tmp)
         )
-    our_intervals, our_weights = run_simproxy(
-        args.bbv, args.k, args.projection_dim
+    our_intervals, our_weights, our_bic = run_simproxy(
+        args.bbv, args.k, args.backend, args.projection_dim
     )
 
     print(f"reference intervals: {sorted(reference_intervals)}")
     print(f"simproxy  intervals: {sorted(our_intervals)}")
     print(f"reference weights:   {sorted(reference_weights)}")
     print(f"simproxy  weights:   {sorted(our_weights)}")
+    print(f"simproxy  BIC:       {our_bic:.6f}")
 
     failures = []
     if len(reference_intervals) != len(our_intervals):

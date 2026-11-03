@@ -1,14 +1,16 @@
 PYTHON ?= python3
 TOOLS_DIR ?= /home/daizhiyuan/workspace/tmpdir/simproxy-tools
 
-.PHONY: help test lint fmt install bootstrap drclient validate-simpoint clean
+.PHONY: help test lint fmt install bootstrap drclient validate-simpoint benchmark-simpoint clean
 
 BBV ?= phase_sample.bbv
 K ?= 3
+CASES ?= 20
 
 help:
-	@echo "targets: install test lint fmt bootstrap drclient validate-simpoint clean"
+	@echo "targets: install test lint fmt bootstrap drclient validate-simpoint benchmark-simpoint clean"
 	@echo "  validate-simpoint BBV=... K=... SIMPOINT_BIN=..."
+	@echo "  benchmark-simpoint CASES=... SIMPOINT_BIN=..."
 
 install:
 	$(PYTHON) -m pip install -e '.[dev]'
@@ -35,6 +37,9 @@ drclient:
 
 validate-simpoint:
 	$(PYTHON) scripts/validate_simpoint.py $(BBV) --k $(K) --strict
+
+benchmark-simpoint:
+	$(PYTHON) scripts/benchmark_simpoint.py --cases $(CASES)
 
 clean:
 	rm -rf build dist *.egg-info .pytest_cache .ruff_cache

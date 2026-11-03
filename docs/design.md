@@ -59,7 +59,14 @@ SimPoint methodology:
    weight = cluster size / total intervals.
 
 The implementation is a clean-room Python/NumPy version, validated against the
-reference SimPoint 3.2 binary in M2.
+reference SimPoint 3.2 binary in M2. Two backends are provided:
+
+- `achlioptas`: sparse projection + k-means++ (fast default).
+- `simpoint`: dense `ran2` projection, random-sample initialization with
+  SimPoint's seed progression, and exact-equality Lloyd convergence, which
+  reproduces reference simulation points and weights for the same input.
+
+See `docs/validation.md` for the equivalence matrix.
 
 ## Proxy synthesis (M3)
 

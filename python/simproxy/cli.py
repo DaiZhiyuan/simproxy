@@ -8,7 +8,15 @@ from pathlib import Path
 import numpy as np
 
 from . import __version__
-from .cluster import cluster, select_representatives
+from .cluster import (
+    DEFAULT_KMEANS_SEED,
+    DEFAULT_PROJECTION_DIM,
+    DEFAULT_PROJECTION_SEED,
+    cluster,
+    cluster_reference,
+    cluster_reference_range,
+    select_representatives,
+)
 from .formats.bbv import concat_bbv, parse_bbv, to_matrix, write_bbv
 from .formats.schema import Manifest, PhaseSpec, ProxySpec, SimPoint, SimPointResult
 from .profiler import (
@@ -48,7 +56,21 @@ def _build_parser() -> argparse.ArgumentParser:
     simpoint.add_argument("--k-min", type=int, default=1)
     simpoint.add_argument("--k-max", type=int, default=10)
     simpoint.add_argument("--seed", type=int, default=0)
-    simpoint.add_argument("--projection-dim", type=int, default=10)
+    simpoint.add_argument(
+        "--backend",
+        choices=["achlioptas", "simpoint"],
+        default="achlioptas",
+        help="projection/initialization backend; 'simpoint' is bit-compatible",
+    )
+    simpoint.add_argument(
+        "--projection-dim",
+        type=int,
+        default=None,
+        help="defaults to 10 (achlioptas) or 15 (simpoint)",
+    )
+    simpoint.add_argument("--projection-seed", type=int, default=DEFAULT_PROJECTION_SEED)
+    simpoint.add_argument("--kmeans-seed", type=int, default=DEFAULT_KMEANS_SEED)
+    simpoint.add_argument("--init-seeds", type=int, default=5)
     simpoint.add_argument("--max-iter", type=int, default=100)
     simpoint.add_argument("--bic-tolerance", type=float, default=0.9)
     simpoint.set_defaults(func=_cmd_simpoint)
@@ -117,12 +139,58 @@ def _cmd_bbv_merge(args: argparse.Namespace) -> int:
 def _cmd_simpoint(args: argparse.Namespace) -> int:
     bbv = parse_bbv(args.input)
     _, matrix = to_matrix(bbv, normalize=True)
+
+    if args.backend == "simpoint":
+        projection_dim = args.projection_dim or DEFAULT_PROJECTION_DIM
+        options = {
+            "projection_dim": projection_dim,
+            "projection_seed": args.projection_seed,
+            "kmeans_seed": args.kmeans_seed,
+            "num_init_seeds": args.init_seeds,
+            "max_iter": args.max_iter,
+        }
+        if args.k_min == args.k_max:
+            reference = cluster_reference(matrix, args.k_min, **options)
+            trials = reference.trials
+        else:
+            reference, runs = cluster_reference_range(
+                matrix,
+                k_min=args.k_min,
+                k_max=args.k_max,
+                bic_tolerance=args.bic_tolerance,
+                **options,
+            )
+            trials = [trial for run in runs for trial in run.trials]
+        simpoints = [
+            SimPoint(
+                cluster=cluster_id,
+                interval=bbv.interval_ids[representative],
+                weight=float(reference.weights[cluster_id]),
+            )
+            for cluster_id, representative in zip(
+                reference.representative_clusters,
+                reference.representatives,
+                strict=True,
+            )
+        ]
+        payload = SimPointResult(
+            source=str(args.input),
+            interval_instructions=args.interval_instructions,
+            num_intervals=len(bbv),
+            k=reference.k,
+            bic=reference.bic,
+            simpoints=simpoints,
+            trials=trials,
+        )
+        payload.to_json(args.output)
+        return 0
+
     result = cluster(
         matrix,
         k_min=args.k_min,
         k_max=args.k_max,
         seed=args.seed,
-        projection_dim=args.projection_dim,
+        projection_dim=args.projection_dim or 10,
         max_iter=args.max_iter,
         bic_tolerance=args.bic_tolerance,
     )
