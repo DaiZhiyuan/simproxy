@@ -15,9 +15,10 @@ The pipeline combines:
   high-fidelity trace-stitching mode used only for validation.
 - **QEMU TCG plugins** as the metric/validation backend.
 
-> Status: M1 (feature extraction). BBV parsing/writing, SimPoint clustering,
-> per-interval feature tables, the DynamoRIO BBV client and toolchain bootstrap
-> are available. Proxy synthesis arrives in M3.
+> Status: M3 v0 (statistical proxy kernels). BBV parsing/writing, SimPoint
+> clustering, per-interval feature tables and ARM64 proxy code generation are
+> available. The generated ELF runs under `qemu-aarch64-static`; fidelity tuning
+> and the extended profiler arrive in M2/M4.
 
 ## Architecture
 
@@ -48,14 +49,16 @@ python3 -m venv /home/daizhiyuan/workspace/tmpdir/simproxy-venv
 # 3. Run unit + end-to-end tests
 /home/daizhiyuan/workspace/tmpdir/simproxy-venv/bin/python -m pytest -q
 
-# 4. Cluster a BBV and emit a proxy spec
-simproxy simpoint -i prog.bbv -o simpoints.json
-simproxy synth -i simpoints.json -o proxy_spec.json
-
-# 5. Derive per-interval features (optionally merged with profiler summaries)
+# 4. Derive per-interval features (optionally merged with profiler summaries)
 simproxy profile -i prog.bbv -o features.jsonl \
   --summary summary.jsonl --opcode-csv opcode_mix.csv
 simproxy features validate -i features.jsonl
+
+# 5. Cluster the BBV, fit phase kernels and build an ARM64 proxy
+simproxy simpoint -i prog.bbv -o simpoints.json
+simproxy synth -i simpoints.json -o proxy_spec.json \
+  --features features.jsonl --emit-elf proxy.elf --manifest manifest.json
+qemu-aarch64-static ./proxy.elf
 ```
 
 ### Verifying against reference SimPoint

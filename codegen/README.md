@@ -1,19 +1,12 @@
 # Code generator (M3)
 
-This directory will host the phase-kernel emitter that turns a `ProxySpec` into a
-native ARM64 executable.
+The statistical phase-kernel emitter lives in `python/simproxy/synth/`:
 
-Planned structure:
+- `kernels.py` turns an interval feature row into per-category operation counts.
+- `emit.py` writes a self-contained C program with one function per phase.
+- `build.py` cross-compiles it to a static ARM64 ELF
+  (`aarch64-linux-gnu-gcc -O2 -static`) and records hashes for the manifest.
 
-```
-codegen/
-├── CMakeLists.txt
-├── include/simproxy/codegen.h
-└── src/
-    ├── kernel.cpp        # statistical phase kernel model
-    ├── emit_aarch64.cpp  # IR -> AArch64 assembly / object
-    └── link.cpp          # driver + linker invocation
-```
-
-M0 intentionally leaves this empty; the interface is frozen in
-`python/simproxy/synthesize` and `docs/data-format.md` first.
+A C++/LLVM backend for exact AArch64 instruction scheduling may replace the C
+emitter later; the `ProxySpec`/`Manifest` interface in
+`python/simproxy/formats/schema.py` stays stable.

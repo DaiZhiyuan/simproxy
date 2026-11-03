@@ -10,13 +10,14 @@ import numpy as np
 from . import __version__
 from .cluster import cluster, select_representatives
 from .formats.bbv import concat_bbv, parse_bbv, to_matrix, write_bbv
-from .formats.schema import PhaseSpec, ProxySpec, SimPoint, SimPointResult
+from .formats.schema import Manifest, PhaseSpec, ProxySpec, SimPoint, SimPointResult
 from .profiler import (
     FeatureTable,
     merge_summaries,
     read_jsonl,
     read_opcode_mix_csv,
 )
+from .synth import build_proxy, emit_c, plan_kernel
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -52,9 +53,24 @@ def _build_parser() -> argparse.ArgumentParser:
     simpoint.add_argument("--bic-tolerance", type=float, default=0.9)
     simpoint.set_defaults(func=_cmd_simpoint)
 
-    synth = sub.add_parser("synth", help="emit a proxy specification skeleton")
+    synth = sub.add_parser("synth", help="emit a proxy specification and kernel ELF")
     synth.add_argument("-i", "--simpoints", type=Path, required=True)
     synth.add_argument("-o", "--output", type=Path, required=True)
+    synth.add_argument(
+        "--features",
+        type=Path,
+        default=None,
+        help="feature table JSONL used to fit phase kernels",
+    )
+    synth.add_argument(
+        "--emit-elf",
+        type=Path,
+        default=None,
+        help="compile the statistical kernels to this ARM64 ELF",
+    )
+    synth.add_argument("--manifest", type=Path, default=None)
+    synth.add_argument("--cc", default="aarch64-linux-gnu-gcc")
+    synth.add_argument("--keep-source", action="store_true")
     synth.set_defaults(func=_cmd_synth)
 
     profile = sub.add_parser("profile", help="derive interval features from a BBV")
@@ -138,16 +154,31 @@ def _cmd_simpoint(args: argparse.Namespace) -> int:
 def _cmd_synth(args: argparse.Namespace) -> int:
     simpoints = SimPointResult.from_json(args.simpoints)
     total_instructions = simpoints.num_intervals * simpoints.interval_instructions
-    phases = [
-        PhaseSpec(
-            cluster=point.cluster,
-            interval=point.interval,
-            weight=point.weight,
-            instructions=int(round(point.weight * total_instructions)),
-            kernel={"mode": "statistical", "status": "pending"},
+
+    features = FeatureTable.from_jsonl(args.features) if args.features else None
+    by_interval = {row.interval: row for row in features} if features else {}
+
+    plans = []
+    phases = []
+    for point in simpoints.simpoints:
+        budget = int(round(point.weight * total_instructions))
+        plan = plan_kernel(
+            point.cluster,
+            budget,
+            by_interval.get(point.interval),
+            seed=point.cluster,
         )
-        for point in simpoints.simpoints
-    ]
+        plans.append(plan)
+        phases.append(
+            PhaseSpec(
+                cluster=point.cluster,
+                interval=point.interval,
+                weight=point.weight,
+                instructions=budget,
+                kernel={"mode": "statistical", **plan.to_dict()},
+            )
+        )
+
     spec = ProxySpec(
         source=simpoints.source,
         total_instructions=total_instructions,
@@ -155,6 +186,35 @@ def _cmd_synth(args: argparse.Namespace) -> int:
         phases=phases,
     )
     spec.to_json(args.output)
+
+    if args.emit_elf is None:
+        return 0
+
+    c_source = emit_c(plans, total_instructions, simpoints.source)
+    build = build_proxy(
+        c_source,
+        args.emit_elf,
+        compiler=args.cc,
+        keep_source=args.keep_source,
+    )
+    manifest_path = args.manifest or args.emit_elf.with_suffix(".manifest.json")
+    manifest = Manifest(
+        proxy=str(args.emit_elf),
+        source=simpoints.source,
+        total_instructions=total_instructions,
+        phases=phases,
+        metrics={
+            "backend": "statistical-kernel",
+            "compiler": build.compiler,
+            "elf_sha256": build.elf_sha256,
+            "source_sha256": build.source_sha256,
+            "k": simpoints.k,
+            "bic": simpoints.bic,
+            "num_intervals": simpoints.num_intervals,
+            "interval_instructions": simpoints.interval_instructions,
+        },
+    )
+    manifest.to_json(manifest_path)
     return 0
 
 

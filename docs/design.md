@@ -80,6 +80,12 @@ feature vector:
 interleaved to preserve phase transitions). The output is an ordinary ARM64 ELF with
 no interpreter overhead, directly runnable under QEMU.
 
+**v0 status:** `python/simproxy/synth/` emits one C function per phase with exact
+logical operation counts per category, cross-compiles it with
+`aarch64-linux-gnu-gcc -O2 -static`, and records compiler/ELF hashes in the
+manifest. Missing summary fields fall back to a documented default mix. Physical
+instruction-count calibration against the original binary is part of M4.
+
 Fallback modes:
 
 - **Trace stitching** (high fidelity, validation only): copy the recorded dynamic
