@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simproxy"
+version = "0.1.0.dev0"
+description = "SimPoint-based synthetic proxy generator for ARM64 program simulation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "SimProxy contributors" }]
+keywords = ["simpoint", "dynamorio", "qemu", "simulation", "arm64"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C",
+]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=12"]
+dev = ["pytest>=7", "ruff>=0.4"]
+all = ["pyarrow>=12", "pytest>=7", "ruff>=0.4"]
+
+[project.scripts]
+simproxy = "simproxy.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "python" }
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["python"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

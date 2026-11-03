@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+      - name: Lint
+        run: python -m ruff check python tests
+      - name: Test
+        run: python -m pytest -q
+
+  drclient:
+    runs-on: ubuntu-24.04
+    env:
+      DR_VERSION: "11.91.20756"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu
+      - name: Fetch DynamoRIO AArch64
+        run: |
+          curl -fL -o dr.tar.gz \
+            "https://github.com/DynamoRIO/dynamorio/releases/download/cronbuild-${DR_VERSION}/DynamoRIO-AArch64-Linux-${DR_VERSION}.tar.gz"
+          tar -xzf dr.tar.gz
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+            -DDynamoRIO_DIR="$PWD/DynamoRIO-AArch64-Linux-${DR_VERSION}/cmake"
+      - name: Build client
+        run: cmake --build build

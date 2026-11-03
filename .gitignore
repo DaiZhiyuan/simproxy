@@ -1,0 +1,38 @@
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Tools / downloads
+.tools/
+*.tar.gz
+
+# Local session log (auto-generated plan transcript)
+PLAN.md
+
+# Profiling artifacts
+*.bbv
+*.bb
+*.parquet
+*.trace
+simpoints.json
+proxy_spec.json
+manifest.json
+proxy.elf
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
