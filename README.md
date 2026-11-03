@@ -15,9 +15,9 @@ The pipeline combines:
   high-fidelity trace-stitching mode used only for validation.
 - **QEMU TCG plugins** as the metric/validation backend.
 
-> Status: M0 (scaffolding). The BBV parser/writer, SimPoint clustering core, CLI,
-> DynamoRIO BBV client and toolchain bootstrap are landing first. Proxy synthesis
-> arrives in M3.
+> Status: M1 (feature extraction). BBV parsing/writing, SimPoint clustering,
+> per-interval feature tables, the DynamoRIO BBV client and toolchain bootstrap
+> are available. Proxy synthesis arrives in M3.
 
 ## Architecture
 
@@ -51,7 +51,25 @@ python3 -m venv /home/daizhiyuan/workspace/tmpdir/simproxy-venv
 # 4. Cluster a BBV and emit a proxy spec
 simproxy simpoint -i prog.bbv -o simpoints.json
 simproxy synth -i simpoints.json -o proxy_spec.json
+
+# 5. Derive per-interval features (optionally merged with profiler summaries)
+simproxy profile -i prog.bbv -o features.jsonl \
+  --summary summary.jsonl --opcode-csv opcode_mix.csv
+simproxy features validate -i features.jsonl
 ```
+
+### Verifying against reference SimPoint
+
+SimProxy's clustering is a clean-room reimplementation, so it is checked against
+the reference SimPoint 3.2 binary (used only as a test oracle):
+
+```bash
+SIMPOINT_BIN=/path/to/SimPoint.3.2/bin/simpoint \
+  python scripts/validate_simpoint.py prog.bbv --k 3 --strict
+```
+
+The writer emits the canonical SimPoint dialect (`T:1:48 :3:24`), so reference
+tooling can consume SimProxy `.bbv` files directly.
 
 ### Building the DynamoRIO client (AArch64)
 

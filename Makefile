@@ -1,10 +1,14 @@
 PYTHON ?= python3
 TOOLS_DIR ?= /home/daizhiyuan/workspace/tmpdir/simproxy-tools
 
-.PHONY: help test lint fmt install bootstrap drclient clean
+.PHONY: help test lint fmt install bootstrap drclient validate-simpoint clean
+
+BBV ?= phase_sample.bbv
+K ?= 3
 
 help:
-	@echo "targets: install test lint fmt bootstrap drclient clean"
+	@echo "targets: install test lint fmt bootstrap drclient validate-simpoint clean"
+	@echo "  validate-simpoint BBV=... K=... SIMPOINT_BIN=..."
 
 install:
 	$(PYTHON) -m pip install -e '.[dev]'
@@ -28,6 +32,9 @@ drclient:
 		-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
 		-DDynamoRIO_DIR=$(TOOLS_DIR)/DynamoRIO-AArch64-Linux-11.91.20756/cmake
 	cmake --build build
+
+validate-simpoint:
+	$(PYTHON) scripts/validate_simpoint.py $(BBV) --k $(K) --strict
 
 clean:
 	rm -rf build dist *.egg-info .pytest_cache .ruff_cache

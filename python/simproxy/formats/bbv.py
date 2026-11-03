@@ -2,15 +2,15 @@
 
 Two textual dialects are accepted:
 
-* SimPoint 3.x::
-
-      T0: 1:12 3:7 8:1
-      T1: 2:5 3:9
-
-* DynamoRIO ``drpoints``::
+* Canonical SimPoint toolkit / DynamoRIO ``drpoints``::
 
       T:1:12 :3:7 :8:1
       T:2:5 :3:9
+
+* SimProxy labeled extension (explicit interval id)::
+
+      T0: 1:12 3:7 8:1
+      T1: 2:5 3:9
 
 Counts are already weighted by the number of instructions in the basic block, so the
 sum of a vector is the number of instructions executed in that interval.
@@ -127,17 +127,36 @@ def parse_bbv(path: str | Path) -> BBV:
     return bbv
 
 
-def write_bbv(path: str | Path, bbv: BBV) -> None:
-    """Write a ``.bbv`` file in SimPoint 3.x dialect."""
+def write_bbv(
+    path: str | Path, bbv: BBV, dialect: str = "simpoint"
+) -> None:
+    """Write a ``.bbv`` file.
+
+    ``dialect="simpoint"`` (default) emits the canonical SimPoint toolkit format,
+    where the interval id is implicit (line order)::
+
+        T:1:48 :3:24
+
+    ``dialect="labeled"`` emits a SimProxy extension with an explicit interval id::
+
+        T0: 1:48 3:24
+    """
+    if dialect not in ("simpoint", "labeled"):
+        raise ValueError(f"unknown BBV dialect: {dialect!r}")
     path = Path(path)
     with _open_text(path, "wt") as fh:
         for interval_id, counts in zip(bbv.interval_ids, bbv.intervals, strict=True):
-            pairs = " ".join(
-                f"{bbid}:{_fmt_count(count)}"
-                for bbid, count in sorted(counts.items())
-                if count != 0
-            )
-            fh.write(f"T{interval_id}: {pairs}\n")
+            items = sorted((bbid, count) for bbid, count in counts.items() if count != 0)
+            if dialect == "simpoint":
+                pairs = " ".join(
+                    f":{bbid}:{_fmt_count(count)}" for bbid, count in items
+                )
+                fh.write(f"T{pairs}\n")
+            else:
+                pairs = " ".join(
+                    f"{bbid}:{_fmt_count(count)}" for bbid, count in items
+                )
+                fh.write(f"T{interval_id}: {pairs}\n")
 
 
 def normalize_counts(counts: Counts) -> Counts:

@@ -39,6 +39,22 @@ def test_roundtrip(tmp_path):
     assert reparsed.interval_ids == [0, 1]
 
 
+def test_default_dialect_is_official_simpoint(tmp_path):
+    bbv = BBV()
+    bbv.append({1: 12, 3: 7})
+    path = tmp_path / "out.bbv"
+    write_bbv(path, bbv)
+    assert path.read_text(encoding="utf-8") == "T:1:12 :3:7\n"
+
+
+def test_labeled_dialect(tmp_path):
+    bbv = BBV()
+    bbv.append({1: 12, 3: 7}, interval_id=5)
+    path = tmp_path / "out.bbv"
+    write_bbv(path, bbv, dialect="labeled")
+    assert path.read_text(encoding="utf-8") == "T5: 1:12 3:7\n"
+
+
 def test_gzip_roundtrip(tmp_path):
     path = tmp_path / "out.bbv.gz"
     with gzip.open(path, "wt", encoding="utf-8") as fh:

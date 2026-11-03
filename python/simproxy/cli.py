@@ -11,6 +11,12 @@ from . import __version__
 from .cluster import cluster, select_representatives
 from .formats.bbv import concat_bbv, parse_bbv, to_matrix, write_bbv
 from .formats.schema import PhaseSpec, ProxySpec, SimPoint, SimPointResult
+from .profiler import (
+    FeatureTable,
+    merge_summaries,
+    read_jsonl,
+    read_opcode_mix_csv,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -50,6 +56,32 @@ def _build_parser() -> argparse.ArgumentParser:
     synth.add_argument("-i", "--simpoints", type=Path, required=True)
     synth.add_argument("-o", "--output", type=Path, required=True)
     synth.set_defaults(func=_cmd_synth)
+
+    profile = sub.add_parser("profile", help="derive interval features from a BBV")
+    profile.add_argument("-i", "--input", type=Path, required=True)
+    profile.add_argument("-o", "--output", type=Path, required=True)
+    profile.add_argument(
+        "--summary",
+        type=Path,
+        action="append",
+        default=[],
+        help="per-interval summary JSONL (repeatable)",
+    )
+    profile.add_argument(
+        "--opcode-csv",
+        type=Path,
+        action="append",
+        default=[],
+        help="opcode mix CSV with interval,opcode_class,count columns",
+    )
+    profile.add_argument("--parquet", type=Path, default=None)
+    profile.set_defaults(func=_cmd_profile)
+
+    features = sub.add_parser("features", help="feature table utilities")
+    features_sub = features.add_subparsers(dest="features_command", required=True)
+    validate = features_sub.add_parser("validate", help="validate a feature table")
+    validate.add_argument("-i", "--input", type=Path, required=True)
+    validate.set_defaults(func=_cmd_features_validate)
 
     return parser
 
@@ -123,6 +155,26 @@ def _cmd_synth(args: argparse.Namespace) -> int:
         phases=phases,
     )
     spec.to_json(args.output)
+    return 0
+
+
+def _cmd_profile(args: argparse.Namespace) -> int:
+    bbv = parse_bbv(args.input)
+    table = FeatureTable.from_bbv(bbv)
+    summaries = [read_jsonl(path) for path in args.summary]
+    summaries += [read_opcode_mix_csv(path) for path in args.opcode_csv]
+    if summaries:
+        table.merge_summary(merge_summaries(*summaries))
+    table.to_jsonl(args.output)
+    if args.parquet is not None:
+        table.to_parquet(args.parquet)
+    return 0
+
+
+def _cmd_features_validate(args: argparse.Namespace) -> int:
+    table = FeatureTable.from_jsonl(args.input)
+    instructions = sum(row.instructions for row in table)
+    print(f"ok: {len(table)} intervals, {instructions} instructions")
     return 0
 
 

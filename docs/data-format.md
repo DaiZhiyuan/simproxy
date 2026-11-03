@@ -8,15 +8,15 @@ each pipeline stage can be re-run independently.
 Two textual dialects are accepted by `simproxy bbv`:
 
 ```
-# SimPoint 3.x
-T0: 1:12 3:7 8:1
-T1: 2:5 3:9
+# Canonical SimPoint toolkit / DynamoRIO drpoints (default output)
+T:1:12 :3:7 :8:1
+T:2:5 :3:9
 ```
 
 ```
-# DynamoRIO drpoints
-T:1:12 :3:7 :8:1
-T:2:5 :3:9
+# SimProxy labeled extension (explicit interval id; accepted on input)
+T0: 1:12 3:7 8:1
+T1: 2:5 3:9
 ```
 
 Rules:
@@ -25,8 +25,10 @@ Rules:
 - A pair `bbid:count` gives the execution frequency of a static basic block,
   **weighted by the number of instructions in that block**. The sum of a line is
   therefore the number of instructions executed in the interval.
-- SimPoint dialect carries an explicit interval id (`T<id>`); the drpoints dialect
-  is ordered and the interval id is implicit (line index).
+- The canonical SimPoint dialect is ordered and the interval id is implicit (line
+  index). This is the only dialect the official SimPoint 3.2 binary parses.
+- The labeled dialect is a SimProxy extension; `write_bbv(..., dialect="labeled")`
+  emits it.
 - `.bbv.gz` is transparently supported by the parser.
 - Normalization divides each interval by its sum so that weights sum to 1.
 
@@ -35,22 +37,35 @@ Rules:
 One row per interval. Extended features are *not* used for clustering; they drive
 proxy synthesis and fidelity evaluation.
 
-| Column | Type | Description |
-|---|---|---|
-| `interval` | int64 | Interval id (0-based) |
-| `instructions` | int64 | Retired instructions in the interval |
-| `bbv` | list<int64> | Sparse `(bbid, count)` pairs (optional; may live in `.bbv`) |
-| `opcode_mix` | map<string,float> | Fraction per instruction class |
-| `loads` / `stores` | int64 | Memory operation counts |
-| `distinct_lines` | int64 | Distinct cache lines touched |
-| `stride_hist` | map<int32,int64> | Access stride histogram |
-| `read_write_ratio` | float | Loads / stores |
-| `branch_taken_rate` | float | Fraction of taken branches |
-| `branch_entropy` | float | Shannon entropy of branch outcomes |
-| `dep_chain_len` | float | Mean dependency chain length |
-| `working_set_bytes` | int64 | Estimated working set |
+One JSON object per line (JSONL), or a Parquet table with the same columns. Fields
+with map types are stored as JSON strings in Parquet.
 
-The schema is frozen in `simproxy.profiler.schema` (M1) and covered by a unit test.
+| Column | Type | Source | Description |
+|---|---|---|---|
+| `interval` | int64 | BBV | Interval id (0-based) |
+| `instructions` | int64 | BBV | Retired instructions in the interval |
+| `num_blocks` | int64 | BBV | Distinct basic blocks executed |
+| `bbv_entropy` | float | BBV | Shannon entropy of the normalized BBV |
+| `top_block_share` | float | BBV | Largest normalized block share |
+| `opcode_mix` | map<string,float> | summary | Fraction per instruction class (sums to 1) |
+| `loads` / `stores` | int64 | summary | Memory operation counts |
+| `distinct_lines` | int64 | summary | Distinct cache lines touched |
+| `stride_hist` | map<string,int64> | summary | Access stride histogram |
+| `read_write_ratio` | float | summary | Loads / stores |
+| `branch_taken_rate` | float | summary | Fraction of taken branches |
+| `branch_entropy` | float | summary | Shannon entropy of branch outcomes |
+| `dep_chain_len` | float | summary | Mean dependency chain length |
+| `working_set_bytes` | int64 | summary | Estimated working set |
+| `extras` | map<string,float> | summary | Forward-compatible extra metrics |
+
+The schema is frozen in `simproxy.profiler.schema` and versioned by
+`FEATURE_SCHEMA_VERSION`.
+
+```bash
+simproxy profile -i prog.bbv -o features.jsonl \
+  --summary summary.jsonl --opcode-csv opcode_mix.csv --parquet features.parquet
+simproxy features validate -i features.jsonl
+```
 
 ## 3. Simulation points (`simpoints.json`)
 

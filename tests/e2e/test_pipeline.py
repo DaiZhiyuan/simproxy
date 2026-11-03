@@ -53,6 +53,41 @@ def test_simpoint_then_synth(tmp_path):
     assert sum(phase["instructions"] for phase in spec["phases"]) == 600_000_000
 
 
+def test_profile_and_validate(tmp_path):
+    bbv_path = tmp_path / "prog.bbv"
+    bbv_path.write_text(SAMPLE, encoding="utf-8")
+    features_path = tmp_path / "features.jsonl"
+    mix_path = tmp_path / "mix.csv"
+    mix_path.write_text(
+        "interval,opcode_class,count\n0,alu,3\n0,load,1\n", encoding="utf-8"
+    )
+
+    assert (
+        main(
+            [
+                "profile",
+                "-i",
+                str(bbv_path),
+                "-o",
+                str(features_path),
+                "--opcode-csv",
+                str(mix_path),
+            ]
+        )
+        == 0
+    )
+    rows = [
+        json.loads(line)
+        for line in features_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    assert len(rows) == 6
+    assert rows[0]["interval"] == 0
+    assert rows[0]["instructions"] == 170
+    assert rows[0]["opcode_mix"] == {"alu": 0.75, "load": 0.25}
+    assert main(["features", "validate", "-i", str(features_path)]) == 0
+
+
 def test_bbv_merge_and_normalize(tmp_path):
     left = tmp_path / "a.bbv"
     right = tmp_path / "b.bbv"
